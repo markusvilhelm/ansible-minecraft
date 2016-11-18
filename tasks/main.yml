@@ -4,29 +4,9 @@
     that:
       - "ansible_os_family in supported_ansible_os_families"
 
-- name: include OS-specific variables
-  include_vars: "{{ ansible_os_family }}.yml"
+- include: "{{ minecraft_hook_before_setup | default('empty.yml') }}"
 
-- name: include Debian-specific tasks
-  include: Debian.yml
-  when: ansible_os_family == 'Debian'
-
-- name: include Red Hat-specific tasks
-  include: RedHat.yml
-  when: ansible_os_family == 'RedHat'
-
-- name: create Minecraft group
-  group:
-    state=present
-    name={{ minecraft_group }}
-    system=yes
-
-- name: create Minecraft user
-  user:
-    state=present
-    name={{ minecraft_user }}
-    group={{ minecraft_group }}
-    home={{ minecraft_home }}
+- include: setup.yml
 
 - include: supervisor.yml
   when: minecraft_process_control == 'supervisor'
@@ -34,70 +14,26 @@
 - include: systemd.yml
   when: minecraft_process_control == 'systemd'
 
-- name: download Minecraft server
-  get_url:
-    url={{ minecraft_url }}/{{ minecraft_version }}/minecraft_server.{{ minecraft_version }}.jar
-    dest={{ minecraft_home }}/minecraft_server.{{ minecraft_version }}.jar
-    owner={{ minecraft_user }}
-    group={{ minecraft_group }}
-    mode=0755
+- include: "{{ minecraft_hook_after_setup | default('empty.yml') }}"
 
-- name: symlink Minecraft server
-  file:
-    src={{ minecraft_home }}/minecraft_server.{{ minecraft_version }}.jar
-    path={{ minecraft_home }}/minecraft_server.jar
-    owner={{ minecraft_user }}
-    group={{ minecraft_group }}
-    state=link
-  notify:
-    - restart Minecraft
+- include: "{{ minecraft_hook_before_download | default('empty.yml') }}"
 
-- name: agree to EULA
-  copy:
-    src=eula.txt
-    dest={{ minecraft_home }}/eula.txt
-    mode=0644
-    owner={{ minecraft_user }}
-    group={{ minecraft_group }}
-  notify:
-    - enable service
+- include: download.yml
 
-- name: update whitelist
-  minecraft_acl:
-    acl: whitelist
-    values: "{{ minecraft_whitelist }}"
-    path: "{{ minecraft_home }}/whitelist.json"
-    owner: "{{ minecraft_user }}"
-    group: "{{ minecraft_user }}"
-  notify:
-    - restart Minecraft
+- include: "{{ minecraft_hook_after_download | default('empty.yml') }}"
 
-- name: update ops
-  minecraft_acl:
-    acl: ops
-    values: "{{ minecraft_ops }}"
-    path: "{{ minecraft_home }}/ops.json"
-    owner: "{{ minecraft_user }}"
-    group: "{{ minecraft_user }}"
-  notify:
-    - restart Minecraft
+- include: "{{ minecraft_hook_before_install | default('empty.yml') }}"
 
-- name: update banned-players
-  minecraft_acl:
-    acl: banned-players
-    values: "{{ minecraft_banned_players }}"
-    path: "{{ minecraft_home }}/banned-players.json"
-    owner: "{{ minecraft_user }}"
-    group: "{{ minecraft_user }}"
-  notify:
-    - restart Minecraft
+- include: install.yml
 
-- name: update banned-ips
-  minecraft_acl:
-    acl: banned-ips
-    values: "{{ minecraft_banned_ips }}"
-    path: "{{ minecraft_home }}/banned-ips.json"
-    owner: "{{ minecraft_user }}"
-    group: "{{ minecraft_user }}"
-  notify:
-    - restart Minecraft
+- include: "{{ minecraft_hook_after_install | default('empty.yml') }}"
+
+- include: acl.yml
+
+- include: configure.yml
+
+- include: "{{ minecraft_hook_before_start | default('empty.yml') }}"
+
+- meta: flush_handlers
+
+- include: "{{ minecraft_hook_after_start | default('empty.yml') }}"

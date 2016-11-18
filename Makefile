@@ -18,6 +18,10 @@ machine targets:
 machines:
 
   $(BOXES)
+
+variables:
+
+  PROCESS_CONTROL   Choose from 'supervisor' or 'systemd'. Default: 'systemd'.
 endef
 
 is_machine_target = $(if $(findstring $(firstword $(MAKECMDGOALS)),$(BOXES)),true,false)
@@ -26,7 +30,7 @@ all:
 	docker-compose build
 
 clean:
-ifeq (true, $(call is_machine_target))
+ifeq (true,$(call is_machine_target))
 	docker rmi -f ansibleminecraft_$(firstword $(MAKECMDGOALS))
 else
 	-docker images -q ansibleminecraft* | xargs docker rmi -f
@@ -36,7 +40,7 @@ help:
 	@echo $(info $(USAGE))
 
 test:
-ifeq (true, $(call is_machine_target))
+ifeq (true,$(call is_machine_target))
 	./scripts/ci.sh $(firstword $(MAKECMDGOALS)) $(PROCESS_CONTROL)
 else
 	$(error `test` requires a machine name, see `make help`)
@@ -44,11 +48,11 @@ endif
 
 $(BOXES):
 # Don't build an image just to delete it.
-ifeq (, $(findstring clean,$(lastword $(MAKECMDGOALS))))
+ifeq (,$(findstring clean,$(lastword $(MAKECMDGOALS))))
 	{ docker images ansibleminecraft_$@ | grep $@; } && exit || docker-compose build $@
 endif
 
 .PHONY: all \
         clean \
-		help \
+        help \
         test
